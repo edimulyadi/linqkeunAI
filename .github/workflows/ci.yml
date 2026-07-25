@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: linqkeun
+          POSTGRES_PASSWORD: linqkeun
+          POSTGRES_DB: linqkeun_ai
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U linqkeun"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://linqkeun:linqkeun@localhost:5432/linqkeun_ai?schema=public
+      JWT_SECRET: ci-test-secret
+      ANTHROPIC_API_KEY: sk-ant-placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --workspaces --include-workspace-root
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Push database schema
+        run: npm run db:push --workspace=packages/database
+
+      - name: Lint
+        run: npm run lint --workspace=apps/web
+
+      - name: Build
+        run: npm run build --workspace=apps/web

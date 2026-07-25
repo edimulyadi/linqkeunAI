@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ToolKind {
+  CONTENT_GENERATION // pure text generation (captions, ad copy, offers, etc)
+  CHAT_ASSISTANT     // multi-turn conversational tool (CS bot, prompting assistant)
+  LANDING_PAGE       // generates a full HTML landing page
+  IMAGE_PROMPT       // generates prompts/briefs for external image/video tools
+  CONNECTOR          // stub for external platform integration (Ads, WhatsApp, Accounting)
+}
+
+enum ConnectorProvider {
+  META_ADS
+  GOOGLE_ADS
+  WHATSAPP
+  INSTAGRAM
+  ACCOUNTING
+}
+
+enum ConnectorStatus {
+  NOT_CONNECTED
+  PENDING
+  CONNECTED
+  ERROR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(USER)
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  generations   Generation[]
+  conversations Conversation[]
+  connectors    ConnectorAccount[]
+  subscription  Subscription?
+
+  @@map("users")
+}
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planCode           String   @default("free") // free | pro | business
+  status             String   @default("active") // active | past_due | canceled
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  code        String   @unique // "1", "2", "3", "4"
+  slug        String   @unique
+  title       String
+  subtitle    String?
+  icon        String   @default("sparkles")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tools AiTool[]
+
+  @@map("categories")
+}
+
+model AiTool {
+  id           String   @id @default(cuid())
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  code         String   @unique // "1.1", "1.2", ...
+  slug         String   @unique
+  title        String
+  icon         String   @default("bot")
+  description  String
+  kind         ToolKind @default(CONTENT_GENERATION)
+  systemPrompt String   @db.Text
+  priceRupiah  Int      @default(0)
+  isActive     Boolean  @default(true)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  generations   Generation[]
+  conversations Conversation[]
+
+  @@map("ai_tools")
+}
+
+model Generation {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolId       String
+  tool         AiTool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  input        Json
+  output       String   @db.Text
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("generations")
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolId    String
+  tool      AiTool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  title     String   @default("New conversation")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // user | assistant
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model ConnectorAccount {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     ConnectorProvider
+  status       ConnectorStatus   @default(NOT_CONNECTED)
+  externalId   String?
+  metadata     Json?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([userId, provider])
+  @@map("connector_accounts")
+}
