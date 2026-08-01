@@ -140,7 +140,7 @@ export default function LandingPage() {
           <div className="card">
             <h4 className="font-semibold">Bagaimana cara kerja automasi workflow?</h4>
             <p className="mt-1 text-white/70">
-              Anda membuat aturan "JIKA (kondisi) MAKA (aksi)" di Settings —
+              Anda membuat aturan &ldquo;JIKA (kondisi) MAKA (aksi)&rdquo; di Settings —
               misalnya memicu Marketing AI membuat tugas kampanye saat
               pendapatan turun lebih dari 10%.
             </p>
