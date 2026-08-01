@@ -7,33 +7,34 @@ export async function GET(req: Request) {
   try {
     await requireAdmin(req);
 
-    const [userCount, generationCount, conversationCount, topTools] =
-      await Promise.all([
-        db.user.count(),
-        db.generation.count(),
-        db.conversation.count(),
-        db.generation.groupBy({
-          by: ["toolId"],
-          _count: { toolId: true },
-          orderBy: { _count: { toolId: "desc" } },
-          take: 5,
-        }),
-      ]);
+    const [userCount, taskCount, conversationCount, workflowCount, topAgents] = await Promise.all([
+      db.user.count(),
+      db.task.count(),
+      db.conversation.count(),
+      db.workflowRule.count({ where: { isActive: true } }),
+      db.conversation.groupBy({
+        by: ["agentId"],
+        _count: { agentId: true },
+        orderBy: { _count: { agentId: "desc" } },
+        take: 5,
+      }),
+    ]);
 
-    const toolIds = topTools.map((t) => t.toolId);
-    const tools = await db.aiTool.findMany({
-      where: { id: { in: toolIds } },
+    const agentIds = topAgents.map((a) => a.agentId);
+    const agents = await db.agent.findMany({
+      where: { id: { in: agentIds } },
       select: { id: true, title: true, slug: true },
     });
-    const toolMap = new Map(tools.map((t) => [t.id, t]));
+    const agentMap = new Map(agents.map((a) => [a.id, a]));
 
     return Response.json({
       userCount,
-      generationCount,
+      taskCount,
       conversationCount,
-      topTools: topTools.map((t) => ({
-        tool: toolMap.get(t.toolId),
-        count: t._count.toolId,
+      activeWorkflowCount: workflowCount,
+      topAgents: topAgents.map((a) => ({
+        agent: agentMap.get(a.agentId),
+        count: a._count.agentId,
       })),
     });
   } catch (error) {

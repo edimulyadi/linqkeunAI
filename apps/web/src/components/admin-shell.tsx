@@ -24,7 +24,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   const links = [
     { href: "/admin", label: "Ringkasan" },
-    { href: "/admin/tools", label: "Karyawan AI" },
+    { href: "/admin/agents", label: "AI Agents" },
     { href: "/admin/users", label: "Pengguna" },
   ];
 
@@ -33,7 +33,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="text-lg font-bold">
-            linqkeun<span className="text-brand-400">AI</span>{" "}
+            Linqkeun<span className="text-brand-400">AI</span>{" "}
             <span className="text-white/40">/ admin</span>
           </Link>
           <nav className="flex gap-4 text-sm">

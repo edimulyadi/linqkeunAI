@@ -15,7 +15,7 @@ export async function GET(req: Request) {
         role: true,
         createdAt: true,
         subscription: { select: { planCode: true, status: true } },
-        _count: { select: { generations: true, conversations: true } },
+        _count: { select: { conversations: true, tasksCreated: true } },
       },
     });
     return Response.json({ users });

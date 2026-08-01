@@ -1,21 +1,44 @@
 import Link from "next/link";
 
-const CATEGORIES = [
+const AGENTS = [
   {
-    title: "Karyawan AI",
-    desc: "Fondasi produktivitas harian: prompting, konten, visual, layanan pelanggan, dan automasi tugas rutin.",
+    title: "CEO AI",
+    desc: "Menggabungkan wawasan seluruh divisi menjadi satu rekomendasi strategis yang jelas.",
   },
   {
-    title: "Business AI",
-    desc: "Sambungkan AI ke iklan dan channel penjualan Anda, dari Meta Ads sampai produk digital.",
+    title: "Finance AI",
+    desc: "Analisis arus kas, forecasting pendapatan, dan optimasi biaya berbasis data nyata.",
   },
   {
-    title: "Manager AI",
-    desc: "Satu AI untuk seluruh organisasi — tiap divisi dapat spesialisnya sendiri, terpantau dari satu panel.",
+    title: "HR AI",
+    desc: "Rekrutmen, evaluasi kinerja, dan kebijakan SDM — tanpa menunggu tim HR penuh waktu.",
   },
   {
-    title: "Vibe Marketing",
-    desc: "Konten, materi iklan, sampai landing page dalam hitungan menit — tanpa harus menunggu tim kreatif.",
+    title: "Marketing AI",
+    desc: "Strategi kampanye dan konten yang merespons cepat saat data performa berubah.",
+  },
+  {
+    title: "Operations AI",
+    desc: "Ubah proses berulang jadi SOP dan alur kerja otomatis yang efisien.",
+  },
+];
+
+const FEATURES = [
+  {
+    title: "Chat dengan tiap AI co-worker",
+    desc: "Antarmuka chat seperti ChatGPT, dengan memori percakapan per pengguna dan riwayat lengkap per agent.",
+  },
+  {
+    title: "Manajemen tugas",
+    desc: "Buat tugas, tugaskan ke AI atau manusia, lalu pantau statusnya — atau biarkan AI langsung mengerjakannya.",
+  },
+  {
+    title: "Automasi berbasis trigger",
+    desc: 'Contoh: "JIKA pendapatan turun → Marketing AI otomatis membuat kampanye." Atur aturan Anda sendiri di Settings.',
+  },
+  {
+    title: "Laporan & analitik",
+    desc: "Insight otomatis dan grafik performa bisnis, dihasilkan langsung dari data yang tercatat di sistem.",
   },
 ];
 
@@ -24,11 +47,14 @@ export default function LandingPage() {
     <main className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="text-xl font-bold tracking-tight">
-          linqkeun<span className="text-brand-400">AI</span>
+          Linqkeun<span className="text-brand-400">AI</span>
         </div>
         <nav className="hidden gap-8 text-sm text-white/70 md:flex">
-          <a href="#karyawan" className="hover:text-white">
-            Karyawan AI
+          <a href="#agents" className="hover:text-white">
+            AI Co-Workers
+          </a>
+          <a href="#features" className="hover:text-white">
+            Fitur
           </a>
           <a href="#faq" className="hover:text-white">
             FAQ
@@ -46,16 +72,17 @@ export default function LandingPage() {
 
       <section className="mx-auto max-w-4xl px-6 py-20 text-center">
         <p className="mb-4 inline-block rounded-full border border-brand-400/30 bg-brand-400/10 px-4 py-1 text-sm text-brand-300">
-          20 Karyawan AI, satu platform
+          ERP + AI Co-Workers + Automation Engine
         </p>
         <h1 className="text-4xl font-extrabold leading-tight tracking-tight md:text-6xl">
-          Delegasikan pekerjaan harian bisnis Anda ke{" "}
-          <span className="text-brand-400">tim AI</span>
+          Jalankan bisnis Anda bersama{" "}
+          <span className="text-brand-400">tim AI co-worker</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-white/70">
-          Dari konten sosial, layanan pelanggan, sampai landing page — linqkeunAI
-          menghadirkan karyawan AI yang siap kerja untuk setiap bagian bisnis
-          Anda, kapan saja dibutuhkan.
+          Linqkeun AI adalah platform ERP di mana setiap fungsi bisnis diwakili
+          oleh AI: CEO, Finance, HR, Marketing, dan Operations. Chat dengan
+          mereka, delegasikan pekerjaan, otomatiskan alur kerja, dan dapatkan
+          insight — semua dari satu dashboard.
         </p>
         <div className="mt-8 flex justify-center gap-4">
           <Link href="/register" className="btn-primary text-base">
@@ -67,49 +94,62 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="karyawan" className="mx-auto max-w-6xl px-6 py-16">
+      <section id="agents" className="mx-auto max-w-6xl px-6 py-16">
+        <h2 className="mb-2 text-center text-3xl font-bold">
+          5 AI Co-Worker, satu tim eksekutif virtual
+        </h2>
+        <p className="mb-10 text-center text-white/60">
+          Setiap agent punya identitas peran, memori, dan tools sendiri — dan
+          bisa saling berkolaborasi.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {AGENTS.map((a) => (
+            <div key={a.title} className="card">
+              <h3 className="mb-2 text-xl font-semibold text-brand-300">{a.title}</h3>
+              <p className="text-white/70">{a.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="features" className="mx-auto max-w-6xl px-6 py-16">
         <h2 className="mb-10 text-center text-3xl font-bold">
-          4 Sesi, 20 Karyawan AI
+          Lebih dari sekadar chatbot
         </h2>
         <div className="grid gap-6 md:grid-cols-2">
-          {CATEGORIES.map((c) => (
-            <div key={c.title} className="card">
-              <h3 className="mb-2 text-xl font-semibold text-brand-300">
-                {c.title}
-              </h3>
-              <p className="text-white/70">{c.desc}</p>
+          {FEATURES.map((f) => (
+            <div key={f.title} className="card">
+              <h3 className="mb-2 text-xl font-semibold text-brand-300">{f.title}</h3>
+              <p className="text-white/70">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section id="faq" className="mx-auto max-w-3xl px-6 py-16">
-        <h2 className="mb-8 text-center text-3xl font-bold">
-          Pertanyaan Umum
-        </h2>
+        <h2 className="mb-8 text-center text-3xl font-bold">Pertanyaan Umum</h2>
         <div className="space-y-4">
           <div className="card">
-            <h4 className="font-semibold">Apakah saya perlu tahu coding?</h4>
+            <h4 className="font-semibold">Apakah AI ini bisa benar-benar mengerjakan tugas?</h4>
             <p className="mt-1 text-white/70">
-              Tidak. Setiap karyawan AI di linqkeunAI dipakai lewat form dan
-              chat sederhana, baik di web maupun aplikasi mobile.
+              Ya. Setiap agent bisa ditugaskan pekerjaan lewat modul Tasks, dan
+              akan mengerjakannya menggunakan tools nyata (data bisnis,
+              knowledge base perusahaan) sebelum menuliskan hasilnya.
             </p>
           </div>
           <div className="card">
-            <h4 className="font-semibold">
-              Bisakah tim saya menggunakan ini bersama?
-            </h4>
+            <h4 className="font-semibold">Bagaimana cara kerja automasi workflow?</h4>
             <p className="mt-1 text-white/70">
-              Ya. Modul Manager AI memungkinkan setiap divisi punya spesialis
-              AI-nya sendiri, dengan pemakaian yang bisa dipantau dari satu
-              panel admin.
+              Anda membuat aturan "JIKA (kondisi) MAKA (aksi)" di Settings —
+              misalnya memicu Marketing AI membuat tugas kampanye saat
+              pendapatan turun lebih dari 10%.
             </p>
           </div>
         </div>
       </section>
 
       <footer className="border-t border-white/10 py-8 text-center text-sm text-white/50">
-        © {new Date().getFullYear()} linqkeunAI. Semua hak dilindungi.
+        © {new Date().getFullYear()} Linqkeun AI. Semua hak dilindungi.
       </footer>
     </main>
   );

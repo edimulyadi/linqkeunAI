@@ -9,7 +9,7 @@ interface AdminUser {
   role: string;
   createdAt: string;
   subscription: { planCode: string; status: string } | null;
-  _count: { generations: number; conversations: number };
+  _count: { conversations: number; tasksCreated: number };
 }
 
 export default function AdminUsersPage() {
@@ -31,8 +31,8 @@ export default function AdminUsersPage() {
               <th className="py-2 pr-4">Nama</th>
               <th className="py-2 pr-4">Email</th>
               <th className="py-2 pr-4">Paket</th>
-              <th className="py-2 pr-4">Generasi</th>
               <th className="py-2 pr-4">Percakapan</th>
+              <th className="py-2 pr-4">Tugas Dibuat</th>
               <th className="py-2 pr-4">Bergabung</th>
             </tr>
           </thead>
@@ -51,8 +51,8 @@ export default function AdminUsersPage() {
                 <td className="py-2 pr-4 text-white/60">
                   {u.subscription?.planCode ?? "free"}
                 </td>
-                <td className="py-2 pr-4">{u._count.generations}</td>
                 <td className="py-2 pr-4">{u._count.conversations}</td>
+                <td className="py-2 pr-4">{u._count.tasksCreated}</td>
                 <td className="py-2 pr-4 text-white/50">
                   {new Date(u.createdAt).toLocaleDateString("id-ID")}
                 </td>

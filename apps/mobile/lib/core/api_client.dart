@@ -105,43 +105,4 @@ class ApiClient {
         : 'Permintaan gagal (${res.statusCode})';
     throw ApiException(res.statusCode, message);
   }
-
-  /// Streams a plain-text AI response chunk-by-chunk, calling [onChunk] for
-  /// each piece of text as it arrives. Returns response headers once the
-  /// stream completes (used to read `X-Conversation-Id`).
-  Future<Map<String, String>> streamPost(
-    String path,
-    Map<String, dynamic> body, {
-    required void Function(String chunk) onChunk,
-  }) async {
-    final client = http.Client();
-    try {
-      final request = http.Request('POST', _uri(path));
-      request.headers.addAll(await _headers());
-      request.body = jsonEncode(body);
-
-      final streamedResponse = await client.send(request);
-      if (streamedResponse.statusCode >= 400) {
-        final body = await streamedResponse.stream.bytesToString();
-        Map<String, dynamic>? decoded;
-        try {
-          decoded = jsonDecode(body) as Map<String, dynamic>;
-        } catch (_) {
-          // ignore
-        }
-        throw ApiException(
-          streamedResponse.statusCode,
-          decoded?['error'] as String? ??
-              'Permintaan AI gagal (${streamedResponse.statusCode})',
-        );
-      }
-
-      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
-        onChunk(chunk);
-      }
-      return streamedResponse.headers;
-    } finally {
-      client.close();
-    }
-  }
 }

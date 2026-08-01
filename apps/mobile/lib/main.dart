@@ -18,7 +18,7 @@ class LinqkeunApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => AuthController()..bootstrap(),
       child: MaterialApp(
-        title: 'linqkeunAI',
+        title: 'Linqkeun AI',
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         home: const RootGate(),

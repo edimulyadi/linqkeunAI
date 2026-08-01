@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../profile/profile_screen.dart';
-import 'tools_list_screen.dart';
+import 'agents_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,7 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [ToolsListScreen(), ProfileScreen()];
+    final pages = const [AgentsListScreen(), ProfileScreen()];
 
     return Scaffold(
       body: pages[_index],
@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.smart_toy_outlined),
             selectedIcon: Icon(Icons.smart_toy),
-            label: 'Karyawan AI',
+            label: 'AI Agents',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
