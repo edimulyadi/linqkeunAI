@@ -19,65 +19,70 @@ class AppUser {
       );
 }
 
-class AiTool {
+/// One AI co-worker (CEO, Finance, HR, Marketing, Operations, or a custom
+/// role an admin defines).
+class Agent {
   final String id;
-  final String code;
   final String slug;
+  final String name;
+  final String roleType;
   final String title;
-  final String icon;
   final String description;
-  final String kind;
+  final String avatarIcon;
+  final String color;
+  final List<String> skills;
 
-  AiTool({
+  Agent({
     required this.id,
-    required this.code,
     required this.slug,
+    required this.name,
+    required this.roleType,
     required this.title,
-    required this.icon,
     required this.description,
-    required this.kind,
+    required this.avatarIcon,
+    required this.color,
+    required this.skills,
   });
 
-  bool get isChat => kind == 'CHAT_ASSISTANT';
-  bool get isLandingPage => kind == 'LANDING_PAGE';
+  bool get isCeo => roleType == 'CEO';
 
-  factory AiTool.fromJson(Map<String, dynamic> json) => AiTool(
+  factory Agent.fromJson(Map<String, dynamic> json) => Agent(
         id: json['id'] as String,
-        code: json['code'] as String,
         slug: json['slug'] as String,
+        name: json['name'] as String,
+        roleType: (json['roleType'] as String?) ?? 'CUSTOM',
         title: json['title'] as String,
-        icon: (json['icon'] as String?) ?? 'bot',
         description: (json['description'] as String?) ?? '',
-        kind: (json['kind'] as String?) ?? 'CONTENT_GENERATION',
+        avatarIcon: (json['avatarIcon'] as String?) ?? 'bot',
+        color: (json['color'] as String?) ?? '#F0B429',
+        skills: (json['skills'] as List<dynamic>? ?? [])
+            .map((s) => s.toString())
+            .toList(),
       );
 }
 
-class AiCategory {
-  final String id;
-  final String title;
-  final String? subtitle;
-  final List<AiTool> tools;
+class ToolCall {
+  final String name;
+  final String result;
 
-  AiCategory({
-    required this.id,
-    required this.title,
-    this.subtitle,
-    required this.tools,
-  });
+  ToolCall({required this.name, required this.result});
 
-  factory AiCategory.fromJson(Map<String, dynamic> json) => AiCategory(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        subtitle: json['subtitle'] as String?,
-        tools: (json['tools'] as List<dynamic>? ?? [])
-            .map((t) => AiTool.fromJson(t as Map<String, dynamic>))
-            .toList(),
+  factory ToolCall.fromJson(Map<String, dynamic> json) => ToolCall(
+        name: json['name'] as String,
+        result: (json['result'] as String?) ?? '',
       );
 }
 
 class ChatMessage {
   final String role; // "user" | "assistant"
   String content;
+  List<ToolCall> toolCalls;
+  bool pending;
 
-  ChatMessage({required this.role, required this.content});
+  ChatMessage({
+    required this.role,
+    required this.content,
+    this.toolCalls = const [],
+    this.pending = false,
+  });
 }

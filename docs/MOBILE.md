@@ -1,9 +1,7 @@
 # Mobile App (Flutter)
 
 `apps/mobile` is a Flutter app targeting Android and iOS, built against the
-same REST API as the web app (see [API.md](API.md)). Verified in this repo:
-`flutter analyze` (clean), `flutter test` (passing), a debug APK build, and
-an iOS simulator build.
+same REST API as the web app (see [API.md](API.md)).
 
 ## Project structure
 
@@ -11,14 +9,14 @@ an iOS simulator build.
 apps/mobile/lib/
 ├── main.dart                       # app entry, auth-gated root routing
 ├── core/
-│   ├── api_client.dart             # REST + streaming client, token storage
+│   ├── api_client.dart             # REST client, token storage
 │   ├── auth_controller.dart        # ChangeNotifier auth state (Provider)
-│   ├── models.dart                 # AppUser, AiTool, AiCategory, ChatMessage
+│   ├── models.dart                 # AppUser, Agent, ToolCall, ChatMessage
 │   └── theme.dart                  # brand colors / ThemeData
 └── features/
     ├── auth/                       # login_screen.dart, register_screen.dart
-    ├── home/                       # home_screen.dart (bottom nav), tools_list_screen.dart
-    ├── tools/                      # tool_runner_screen.dart (generate), chat_tool_screen.dart
+    ├── home/                       # home_screen.dart (bottom nav), agents_list_screen.dart
+    ├── agents/                     # agent_chat_screen.dart
     └── profile/                    # profile_screen.dart
 ```
 
@@ -56,11 +54,14 @@ Defaults to `http://localhost:3000` if omitted, with one adjustment: on the
 for local development against `npm run dev`. iOS simulators can reach
 `localhost` directly.
 
-Streaming (`ApiClient.streamPost`) uses `http.Client().send()` to get a
-`StreamedResponse` and reads it chunk-by-chunk with
-`stream.transform(utf8.decoder)` — this is what powers the token-by-token
-feel in both the tool runner screen and the chat screen, matching the web
-app's `fetch` + `ReadableStream` reader.
+`AgentChatScreen` calls `POST /api/ai/chat` with a plain `ApiClient.post()`
+and awaits the full JSON response (not a stream) — the backend runs a
+tool-use loop before it has a final answer, so there's no meaningful
+partial text to stream. See
+[AI_AGENTS.md](AI_AGENTS.md#why-chat-is-non-streaming) for why. The screen
+shows a "sedang berpikir..." bubble while the request is in flight, and
+renders which tools the agent used (`ToolCall`) as small chips under its
+reply.
 
 ## Running locally
 
@@ -120,14 +121,19 @@ without signing:
 flutter build ios --simulator --debug
 ```
 
-## Adding a new AI tool to the mobile app
+## Adding a new AI agent to the mobile app
 
-You don't need a mobile release for this — new tools created in
-`/admin/tools` on the web app appear automatically in
-`GET /api/tools`, which `ToolsListScreen` fetches at runtime. The mobile app
-only needs a code change if a tool needs a `kind` the app doesn't already
-handle (currently: `CHAT_ASSISTANT` → `ChatToolScreen`, everything else →
-`ToolRunnerScreen`, including `LANDING_PAGE` — the runner screen doesn't yet
-render an HTML preview like the web app's iframe does; that's the one
-mobile-specific enhancement worth adding if landing-page generation becomes
-a primary mobile use case).
+You don't need a mobile release for this — new agents created in
+`/admin/agents` on the web app appear automatically in `GET /api/agents`,
+which `AgentsListScreen` fetches at runtime. There is no agent-specific
+branching in the mobile UI (every agent uses the same chat screen), so new
+agents just work.
+
+## Feature parity with web
+
+The mobile app currently covers chat only (agent list + chat). Tasks,
+Reports, and Settings (knowledge base / workflow automation) are web-only
+so far — the API routes they use (`/api/tasks`, `/api/reports`,
+`/api/knowledge`, `/api/workflows`) are the same ones the web dashboard
+calls, so adding the equivalent mobile screens is additive, not a backend
+change.

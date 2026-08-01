@@ -49,28 +49,41 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
   if (!user) return null;
 
+  const links = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/dashboard/chat", label: "AI Chat" },
+    { href: "/dashboard/tasks", label: "Tasks" },
+    { href: "/dashboard/reports", label: "Reports" },
+    { href: "/dashboard/settings", label: "Settings" },
+  ];
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="text-lg font-bold">
-            linqkeun<span className="text-brand-400">AI</span>
+            Linqkeun<span className="text-brand-400">AI</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
-            <Link
-              href="/dashboard"
-              className={`hover:text-brand-300 ${
-                pathname === "/dashboard" ? "text-brand-400" : "text-white/70"
-              }`}
-            >
-              Karyawan AI
-            </Link>
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`hover:text-brand-300 ${
+                  pathname === l.href || (l.href !== "/dashboard" && pathname.startsWith(l.href))
+                    ? "text-brand-400"
+                    : "text-white/70"
+                }`}
+              >
+                {l.label}
+              </Link>
+            ))}
             {user.role === "ADMIN" && (
               <Link href="/admin" className="text-white/70 hover:text-brand-300">
                 Admin
               </Link>
             )}
-            <span className="text-white/50">{user.name}</span>
+            <span className="hidden text-white/50 sm:inline">{user.name}</span>
             <button onClick={logout} className="btn-secondary px-3 py-1.5 text-xs">
               Keluar
             </button>

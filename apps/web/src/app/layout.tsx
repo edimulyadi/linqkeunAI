@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "linqkeunAI — 20 Karyawan AI untuk Bisnis Anda",
+  title: "Linqkeun AI — ERP AI Co-Workers untuk Bisnis Anda",
   description:
-    "Platform AI karyawan untuk konten, marketing, layanan pelanggan, dan operasional bisnis Anda.",
+    "ERP + AI Co-Workers + Automation Engine. Jalankan bisnis lebih cepat bersama CEO, Finance, HR, Marketing, dan Operations AI dalam satu platform.",
 };
 
 export default function RootLayout({

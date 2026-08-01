@@ -13,20 +13,51 @@ enum Role {
   ADMIN
 }
 
-enum ToolKind {
-  CONTENT_GENERATION // pure text generation (captions, ad copy, offers, etc)
-  CHAT_ASSISTANT     // multi-turn conversational tool (CS bot, prompting assistant)
-  LANDING_PAGE       // generates a full HTML landing page
-  IMAGE_PROMPT       // generates prompts/briefs for external image/video tools
-  CONNECTOR          // stub for external platform integration (Ads, WhatsApp, Accounting)
+enum AgentRole {
+  CEO
+  FINANCE
+  HR
+  MARKETING
+  OPERATIONS
+  CUSTOM
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkflowTriggerType {
+  METRIC_THRESHOLD // fires when a BusinessMetric crosses/drops past a value
+  MANUAL // fires only when a human clicks "Run now"
+  SCHEDULE // intended for a cron-driven caller (see docs/DEPLOYMENT.md)
+}
+
+enum WorkflowActionType {
+  CREATE_TASK // create a Task assigned to targetAgent
+  RUN_AGENT // ask targetAgent to act immediately and log the result
+}
+
+enum WorkflowRunStatus {
+  TRIGGERED
+  SKIPPED // condition evaluated false
+  FAILED
 }
 
 enum ConnectorProvider {
-  META_ADS
-  GOOGLE_ADS
   WHATSAPP
-  INSTAGRAM
-  ACCOUNTING
+  EMAIL
+  GOOGLE_SHEETS
+  CRM
 }
 
 enum ConnectorStatus {
@@ -46,88 +77,66 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  generations   Generation[]
-  conversations Conversation[]
-  connectors    ConnectorAccount[]
-  subscription  Subscription?
+  conversations   Conversation[]
+  connectors      ConnectorAccount[]
+  subscription    Subscription?
+  tasksCreated    Task[]             @relation("TaskCreatedBy")
+  tasksAssigned   Task[]             @relation("TaskAssignedToUser")
+  knowledgeAdded  KnowledgeBaseEntry[]
+  workflowsCreated WorkflowRule[]
+  activityLogs    ActivityLog[]
 
   @@map("users")
 }
 
 model Subscription {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planCode           String   @default("free") // free | pro | business
-  status             String   @default("active") // active | past_due | canceled
-  currentPeriodEnd   DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planCode         String    @default("free") // free | pro | business
+  status           String    @default("active") // active | past_due | canceled
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@map("subscriptions")
 }
 
-model Category {
-  id          String   @id @default(cuid())
-  code        String   @unique // "1", "2", "3", "4"
-  slug        String   @unique
-  title       String
-  subtitle    String?
-  icon        String   @default("sparkles")
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  tools AiTool[]
-
-  @@map("categories")
-}
-
-model AiTool {
-  id           String   @id @default(cuid())
-  categoryId   String
-  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  code         String   @unique // "1.1", "1.2", ...
-  slug         String   @unique
+/// One row per AI co-worker (CEO, Finance, HR, Marketing, Operations, or a
+/// custom role an admin defines). systemPrompt + skills + tools together
+/// define the agent's identity; tools is a list of tool names it is
+/// permitted to call (see apps/web/src/ai/tools.ts for the implementations).
+model Agent {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
+  roleType     AgentRole @default(CUSTOM)
   title        String
-  icon         String   @default("bot")
   description  String
-  kind         ToolKind @default(CONTENT_GENERATION)
-  systemPrompt String   @db.Text
-  priceRupiah  Int      @default(0)
-  isActive     Boolean  @default(true)
-  order        Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  avatarIcon   String    @default("bot")
+  color        String    @default("#f0b429")
+  systemPrompt String    @db.Text
+  skills       String[]  @default([])
+  tools        String[]  @default([]) // e.g. ["get_business_metrics", "create_task"]
+  isActive     Boolean   @default(true)
+  order        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  generations   Generation[]
-  conversations Conversation[]
+  conversations       Conversation[]
+  tasksAssigned        Task[]         @relation("TaskAssignedToAgent")
+  workflowTargets       WorkflowRule[] @relation("WorkflowTargetAgent")
+  activityLogs          ActivityLog[]
 
-  @@map("ai_tools")
-}
-
-model Generation {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  toolId       String
-  tool         AiTool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  input        Json
-  output       String   @db.Text
-  inputTokens  Int      @default(0)
-  outputTokens Int      @default(0)
-  createdAt    DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@map("generations")
+  @@map("agents")
 }
 
 model Conversation {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  toolId    String
-  tool      AiTool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
   title     String   @default("New conversation")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,22 +153,133 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           String // user | assistant
   content        String       @db.Text
+  toolCalls      Json? // [{ name, input, result }] — transparency into what the agent did
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
   @@map("messages")
 }
 
+/// Work items. Can be assigned to a human, an AI agent, or created
+/// automatically by a WorkflowRule.
+model Task {
+  id                String       @id @default(cuid())
+  title             String
+  description       String       @db.Text
+  status            TaskStatus   @default(TODO)
+  priority          TaskPriority @default(MEDIUM)
+  assignedAgentId   String?
+  assignedAgent     Agent?       @relation("TaskAssignedToAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  assignedUserId    String?
+  assignedUser      User?        @relation("TaskAssignedToUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdByUserId   String
+  createdByUser     User         @relation("TaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  sourceWorkflowRunId String?
+  sourceWorkflowRun WorkflowRun? @relation(fields: [sourceWorkflowRunId], references: [id], onDelete: SetNull)
+  result            String?      @db.Text // agent's output once it completes the task
+  dueDate           DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([status])
+  @@index([assignedAgentId])
+  @@map("tasks")
+}
+
+/// Automation rule: IF trigger THEN action. Evaluated on demand via
+/// POST /api/workflows/[id]/run (see docs/API.md and DEPLOYMENT.md for how
+/// to drive that from a scheduler in production).
+model WorkflowRule {
+  id              String              @id @default(cuid())
+  name            String
+  description     String
+  triggerType     WorkflowTriggerType @default(MANUAL)
+  triggerConfig   Json // e.g. { "metricKey": "revenue", "comparator": "drop_percent", "value": 10 }
+  actionType      WorkflowActionType  @default(CREATE_TASK)
+  actionConfig    Json // e.g. { "taskTitle": "...", "taskDescription": "..." }
+  targetAgentId   String?
+  targetAgent     Agent?              @relation("WorkflowTargetAgent", fields: [targetAgentId], references: [id], onDelete: SetNull)
+  isActive        Boolean             @default(true)
+  createdByUserId String
+  createdByUser   User                @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  runs WorkflowRun[]
+
+  @@map("workflow_rules")
+}
+
+model WorkflowRun {
+  id          String            @id @default(cuid())
+  workflowId  String
+  workflow    WorkflowRule      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status      WorkflowRunStatus
+  summary     String            @db.Text
+  createdAt   DateTime          @default(now())
+
+  createdTasks Task[]
+
+  @@index([workflowId, createdAt])
+  @@map("workflow_runs")
+}
+
+/// Company context fed to agents as retrieval context (simple keyword
+/// matching — see apps/web/src/ai/orchestrator.ts).
+model KnowledgeBaseEntry {
+  id              String   @id @default(cuid())
+  title           String
+  content         String   @db.Text
+  category        String   @default("general")
+  createdByUserId String
+  createdByUser   User     @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("knowledge_base_entries")
+}
+
+/// Time-series KPI values that back the dashboard, /api/reports, and
+/// METRIC_THRESHOLD workflow triggers.
+model BusinessMetric {
+  id         String   @id @default(cuid())
+  metricKey  String // revenue | expenses | customers | tasksCompleted
+  label      String
+  value      Float
+  periodDate DateTime // normalized to the 1st of the month
+  createdAt  DateTime @default(now())
+
+  @@unique([metricKey, periodDate])
+  @@index([metricKey, periodDate])
+  @@map("business_metrics")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  agentId    String?
+  agent      Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  action     String // e.g. "task.created", "workflow.triggered", "agent.chat"
+  entityType String? // "Task" | "WorkflowRule" | "Conversation" | ...
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
 model ConnectorAccount {
-  id           String            @id @default(cuid())
-  userId       String
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider     ConnectorProvider
-  status       ConnectorStatus   @default(NOT_CONNECTED)
-  externalId   String?
-  metadata     Json?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id         String            @id @default(cuid())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   ConnectorProvider
+  status     ConnectorStatus   @default(NOT_CONNECTED)
+  externalId String?
+  metadata   Json?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
   @@unique([userId, provider])
   @@map("connector_accounts")

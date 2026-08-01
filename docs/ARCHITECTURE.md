@@ -5,8 +5,8 @@
 ```
                          ┌─────────────────────────┐
                          │        Postgres          │
-                         │  (users, tools, chats,   │
-                         │   generations, ...)       │
+                         │  (users, agents, tasks,  │
+                         │  workflows, metrics, ...) │
                          └────────────▲──────────────┘
                                       │ Prisma
                          ┌────────────┴──────────────┐
@@ -19,32 +19,41 @@
                          │  └───────────────────────┘ │
                          │  ┌───────────────────────┐ │
    Flutter app ─────────▶│  │  REST API (/api/*)    │◀┼──── Anthropic Claude
-   (Android/iOS)          │  └───────────────────────┘ │      (claude-opus-5)
+   (Android/iOS)          │  │  AI orchestration     │ │      (claude-opus-5,
+                         │  │  (apps/web/src/ai/*)   │ │       tool use)
+                         │  └───────────────────────┘ │
                          └─────────────────────────────┘
 ```
 
 Everything — the marketing site, the authenticated dashboard, the admin
-panel, and the JSON API consumed by the Flutter app — is one Next.js
-application (`apps/web`). There is no separate backend service: API routes
-under `src/app/api/**` *are* the backend.
+panel, the AI orchestration layer, and the JSON API consumed by the Flutter
+app — is one Next.js application (`apps/web`). There is no separate backend
+service: API routes under `src/app/api/**` *are* the backend, and
+`src/ai/**` *is* the AI engine (the "ai-engine" layer from the product spec,
+living inside the same app rather than a separate microservice).
 
-## Why one Next.js app instead of a separate API service
+## Why one Next.js app instead of a separate API + AI service
 
-- Next.js API routes give us serverless-friendly HTTP handlers, streaming
-  responses (`ReadableStream`), and React Server Components in the same
-  codebase — no duplicated types, no separate deploy pipeline for a "backend"
-  that would just be a thin CRUD + AI-proxy layer anyway.
+- Next.js API routes give us serverless-friendly HTTP handlers and React
+  Server Components in the same codebase — no duplicated types, no separate
+  deploy pipeline for a backend that would just be a thin CRUD + AI-proxy
+  layer anyway.
+- The AI orchestration layer (`src/ai/orchestrator.ts`, `src/ai/tools.ts`,
+  `src/ai/workflow-engine.ts`) calls the same Prisma client as the rest of
+  the app directly — no internal HTTP hop between "backend" and "AI engine".
 - The Flutter app and the browser hit the exact same endpoints, authenticated
   the same way (see below), so behavior never drifts between clients.
-- If the product later needs a dedicated backend (e.g. heavy background
-  jobs), the API routes can be lifted out with minimal change since they
-  already only depend on `packages/database` and `ANTHROPIC_API_KEY`.
+- If the product later needs a dedicated worker (e.g. heavy background
+  jobs, a real scheduler for `SCHEDULE`-triggered workflows), the AI
+  orchestration functions can be lifted out with minimal change since they
+  only depend on `packages/database` and `ANTHROPIC_API_KEY`.
 
 ## Monorepo layout
 
 | Path | Purpose |
 |---|---|
-| `apps/web` | Next.js 14 App Router app: pages, API routes, auth, AI integration |
+| `apps/web` | Next.js 14 App Router app: pages, API routes, auth, AI orchestration |
+| `apps/web/src/ai` | The AI engine: tool implementations, agent router/orchestrator, workflow automation engine |
 | `apps/mobile` | Flutter app (Android + iOS) |
 | `packages/database` | Prisma schema, generated client, seed script — imported by `apps/web` as `@linqkeun/database` |
 | `docs/` | This documentation |
@@ -61,18 +70,27 @@ Defined in [`packages/database/prisma/schema.prisma`](../packages/database/prism
   `planCode` (`free`/`pro`/`business`) and status. No payment gateway is
   wired yet — this table is the integration point for one later (see
   [DEPLOYMENT.md](DEPLOYMENT.md#adding-payments-later)).
-- **Category** — the 4 sessions (Karyawan AI, Business AI, Manager AI, Vibe
-  Marketing).
-- **AiTool** — one of the 20 seeded tools. Holds the `systemPrompt` sent to
-  Claude, a `kind` (`CONTENT_GENERATION`, `CHAT_ASSISTANT`, `LANDING_PAGE`,
-  `IMAGE_PROMPT`, `CONNECTOR`), and admin-editable metadata (title,
-  description, price, active flag).
-- **Generation** — one row per single-shot AI call (input, output, token
-  usage), for usage analytics.
-- **Conversation** / **Message** — multi-turn history for `CHAT_ASSISTANT`
-  tools.
+- **Agent** — one of the 5 seeded AI co-workers (or a custom one an admin
+  adds). Holds `systemPrompt`, `skills`, `tools` (which functions it may
+  call), and admin-editable metadata. See [AI_AGENTS.md](AI_AGENTS.md).
+- **Conversation** / **Message** — multi-turn chat history per user per
+  agent. `Message.toolCalls` stores which tools an assistant reply used, for
+  transparency in the UI.
+- **Task** — work items, assignable to an `Agent`, a `User`, both, or
+  neither. `result` holds an AI agent's output once it completes a task via
+  `POST /api/tasks/:id/run`.
+- **WorkflowRule** / **WorkflowRun** — automation rules ("IF trigger THEN
+  action") and a log of every time one was evaluated. See
+  [AI_AGENTS.md](AI_AGENTS.md#workflow-automation).
+- **KnowledgeBaseEntry** — company context (policies, product info, brand
+  positioning) fed to agents as retrieval context.
+- **BusinessMetric** — monthly KPI time series (revenue, expenses,
+  customers, tasksCompleted) backing the dashboard, `/api/reports`, and
+  `METRIC_THRESHOLD` workflow triggers.
+- **ActivityLog** — audit trail of what users and agents did, shown on the
+  dashboard's activity feed.
 - **ConnectorAccount** — status/config placeholder for external platform
-  integrations (Meta Ads, Google Ads, WhatsApp, accounting software).
+  integrations (WhatsApp, Email, Google Sheets, CRM).
 
 ## Auth
 
@@ -95,47 +113,46 @@ cookie jar by default):
    browser requests away from `/dashboard` and `/admin` before the page even
    renders (API routes still independently enforce auth).
 
-## AI generation pipeline
+## AI engine
 
-`src/lib/anthropic.ts` wraps `@anthropic-ai/sdk`. All calls use
-`claude-opus-5` (do not change this without an explicit reason — see the
-Claude API skill notes in the codebase) and `output_config.effort` tuned per
-tool kind (`high` for `LANDING_PAGE`, `medium` otherwise).
+See [AI_AGENTS.md](AI_AGENTS.md) for the full design. In short:
 
-Two API routes drive it:
+- `src/lib/anthropic.ts` — `runWithTools()`, a generic Claude tool-use loop
+  (model call → execute any `tool_use` blocks → feed results back → repeat).
+  All calls use `claude-opus-5` (do not change this without an explicit
+  reason).
+- `src/ai/tools.ts` — the real, DB-backed tool implementations
+  (`get_business_metrics`, `list_tasks`, `create_task`,
+  `search_knowledge_base`).
+- `src/ai/orchestrator.ts` — `runAgentTurn()`, the per-agent entry point:
+  builds the system prompt (persona + knowledge-base context), wires up the
+  agent's allowed tools, and for the CEO agent adds `delegate_to_agent` so it
+  can consult specialists and synthesize their answers.
+- `src/ai/workflow-engine.ts` — `evaluateAndRunWorkflow()`, the automation
+  rule evaluator (trigger check → task creation or agent run).
 
-- **`POST /api/ai/generate`** — single-shot generation for
-  `CONTENT_GENERATION` / `LANDING_PAGE` / `IMAGE_PROMPT` tools. Streams
-  Claude's text back to the client as a raw `text/plain` stream (no SSE
-  framing needed — both the browser `fetch` reader and Flutter's
-  `http.Client().send()` consume it directly), then persists a `Generation`
-  row once the stream finishes.
-- **`POST /api/ai/chat`** — multi-turn conversation for `CHAT_ASSISTANT`
-  tools. Loads (or creates) a `Conversation`, replays its `Message` history
-  as context, streams the reply the same way, then persists both the user
-  message and the assistant reply.
+Three API routes drive the AI engine:
 
-Both routes consume the Anthropic SDK's raw async-iterator event stream
-(`for await (const event of apiStream)`) rather than mixing `.on()`
-listeners with `.finalMessage()` — the latter combination has a known SDK
-state-machine bug when a request fails before any content arrives (e.g. an
-invalid API key), so this codebase deliberately avoids it.
+- **`POST /api/ai/chat`** — per-agent conversational chat (persisted).
+- **`POST /api/ai/orchestrate`** — forces the CEO agent to consult
+  specialists before answering ("ask the whole company").
+- **`POST /api/ai/analyze`** — structured, tool-grounded JSON insight for
+  the dashboard's AI Insights panel (not a persona chat).
 
 ## Admin panel
 
 `/admin` (role-gated by `requireAdmin` + middleware) exposes:
 
-- **Overview** (`/admin`, `GET /api/admin/stats`) — user/generation/
-  conversation counts, most-used tools.
-- **Tools** (`/admin/tools`, `/api/admin/tools*`) — full CRUD over the AI
-  tool catalog: edit title/description/system prompt/price, toggle active,
-  create new tools without a deploy.
+- **Overview** (`/admin`, `GET /api/admin/stats`) — user/task/conversation
+  counts, most-active agents.
+- **Agents** (`/admin/agents`, `/api/admin/agents*`) — full CRUD over the
+  agent roster: edit title/description/system prompt/skills/tools, toggle
+  active, create new agents without a deploy.
 - **Users** (`/admin/users`, `/api/admin/users`) — list of accounts with
   usage counts.
 
 ## Mobile app
 
-The Flutter app (`apps/mobile`) mirrors the web dashboard: a tool catalog
-screen, a generic "runner" screen for single-shot tools, a chat screen for
-conversational tools, and a profile screen. It talks to the exact same API
-— see [MOBILE.md](MOBILE.md).
+The Flutter app (`apps/mobile`) mirrors the web chat experience: an agent
+list screen and a chat screen per agent. It talks to the exact same API —
+see [MOBILE.md](MOBILE.md).
